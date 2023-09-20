@@ -1,7 +1,7 @@
 [package]
 name = "canary_probe"
 description = "Canary Probe is a simple tool to help students in Computer Programming I (CSU0001, NTNU) to test their code."
-version = "0.1.0"
+version = "0.1.1"
 keywords = []
 readme = "README.md"
 license = "AGPL-3.0"
