@@ -7,3 +7,10 @@ It checks about the following:
 - Is the homework archive unpackable?
 - Is the Makefile working?
 - What are the executable files present?
+
+## Usage
+
+```bash
+cargo install canary-probe
+canary-probe <zip-file>
+```
