@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "canary-probe"
+]
+resolver = "2"

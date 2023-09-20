@@ -1,0 +1,23 @@
+[package]
+name = "canary_probe"
+description = "Canary Probe is a simple tool to help students in Computer Programming I (CSU0001, NTNU) to test their code."
+version = "0.1.0"
+keywords = []
+readme = "README.md"
+license = "AGPL-3.0"
+edition = "2021"
+homepage = "https://github.com/JacobLinCool/canary-probe"
+repository = "https://github.com/JacobLinCool/canary-probe"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "canary-probe"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.75"
+bollard = { version = "0.15.0", features = ["tokio-stream"] }
+futures-util = "0.3.28"
+tokio = { version = "1.32.0", features = ["macros", "rt", "rt-multi-thread"] }
+uuid = { version = "1.4.1", features = ["v4"] }
