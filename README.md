@@ -10,7 +10,15 @@ It checks about the following:
 
 ## Usage
 
+Canary<sup>probe</sup> comes with a command line tool and a library.
+
+### Command line tool
+
 ```bash
 cargo install canary-probe
 canary-probe <zip-file>
 ```
+
+### Library
+
+See [docs.rs](https://docs.rs/canary-probe) for documentation.
