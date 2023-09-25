@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.75"
-bollard = { version = "0.15.0", features = ["tokio-stream", "ssl", "json_data_content"] }
+bollard = { version = "0.15.0", features = ["tokio-stream", "json_data_content"] }
 futures-util = "0.3.28"
 tokio = { version = "1.32.0", features = ["macros", "rt", "rt-multi-thread"] }
 uuid = { version = "1.4.1", features = ["v4"] }
