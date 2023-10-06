@@ -179,7 +179,7 @@ async fn run_checks_inner(
     crate::exec::exec(
         docker,
         container_name,
-        format!("timeout 30 unzip -j {}", &config.zip_name).as_str(),
+        format!("timeout 30 unzip {}", &config.zip_name).as_str(),
         Some(working_dir.as_str()),
     )
     .await
