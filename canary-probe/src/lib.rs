@@ -1,12 +1,15 @@
+mod exec;
+
 use anyhow::Result;
 pub use bollard;
 use bollard::container::{Config, CreateContainerOptions, RemoveContainerOptions};
-use bollard::exec;
 use bollard::image::CreateImageOptions;
 use bollard::models::HostConfig;
 use bollard::Docker;
 use futures_util::TryStreamExt;
 use std::collections::HashMap;
+use std::io::Write;
+use std::{fs, path};
 
 #[derive(Debug, Clone)]
 pub struct CheckConfig {
@@ -18,6 +21,8 @@ pub struct CheckConfig {
     pub memory_limit: i64,
     pub cpu_limit: i64,
     pub disk_limit: String,
+    pub extract: Option<String>,
+    pub debug: bool,
 }
 
 impl Default for CheckConfig {
@@ -31,6 +36,8 @@ impl Default for CheckConfig {
             memory_limit: 1024 * 1024 * 1024,
             cpu_limit: 1,
             disk_limit: "1G".to_string(),
+            extract: None,
+            debug: false,
         }
     }
 }
@@ -161,24 +168,51 @@ async fn run_checks_inner(
     container_name: &str,
     config: &CheckConfig,
 ) -> Result<Vec<String>> {
-    exec(
+    let working_dir = config.working_dir.clone();
+
+    if config.debug {
+        let output =
+            crate::exec::exec(docker, container_name, "ls -la", Some(working_dir.as_str())).await?;
+        println!("contents:\n{}", output);
+    }
+
+    crate::exec::exec(
         docker,
         container_name,
-        format!("timeout 30 unzip {}", &config.zip_name).as_str(),
+        format!("timeout 30 unzip -j {}", &config.zip_name).as_str(),
+        Some(working_dir.as_str()),
     )
     .await
     .map_err(|err| CheckError::UnzipError {
         output: err.to_string(),
     })?;
-    exec(docker, container_name, "timeout 30 make")
-        .await
-        .map_err(|err| CheckError::MakeError {
-            output: err.to_string(),
-        })?;
-    let output = exec(
+    if config.debug {
+        let output =
+            crate::exec::exec(docker, container_name, "ls -la", Some(working_dir.as_str())).await?;
+        println!("after unzip:\n{}", output);
+    }
+
+    crate::exec::exec(
+        docker,
+        container_name,
+        "timeout 30 make",
+        Some(working_dir.as_str()),
+    )
+    .await
+    .map_err(|err| CheckError::MakeError {
+        output: err.to_string(),
+    })?;
+    if config.debug {
+        let output =
+            crate::exec::exec(docker, container_name, "ls -la", Some(working_dir.as_str())).await?;
+        println!("after make:\n{}", output);
+    }
+
+    let output = crate::exec::exec(
         docker,
         container_name,
         "timeout 10 find . -type f -perm /111",
+        Some(working_dir.as_str()),
     )
     .await
     .map_err(|err| CheckError::FindError {
@@ -187,45 +221,32 @@ async fn run_checks_inner(
 
     let mut executables: Vec<String> = Vec::new();
     for line in output.lines() {
+        let line = if let Some(line) = line.strip_prefix("./") {
+            line
+        } else {
+            line
+        };
+
+        if line.starts_with('_') {
+            continue;
+        }
+
         executables.push(line.to_string());
     }
 
     executables.sort_unstable();
-    Ok(executables)
-}
 
-async fn exec(docker: &Docker, container_name: &str, cmd: &str) -> Result<String> {
-    let error_code = uuid::Uuid::new_v4();
-    let command = format!("{} || echo {}", cmd, error_code);
+    if let Some(dest) = &config.extract {
+        let parent = path::Path::new(dest).parent().unwrap();
+        if !parent.exists() {
+            fs::create_dir_all(parent)?;
+        }
 
-    let exec_config = exec::CreateExecOptions {
-        attach_stdout: Some(true),
-        cmd: Some(vec!["/bin/sh", "-c", command.as_str()]),
-        ..Default::default()
-    };
-
-    let exec = docker.create_exec(container_name, exec_config).await?;
-    let output = if let exec::StartExecResults::Attached { output, .. } =
-        docker.start_exec(&exec.id, None).await?
-    {
-        output
-            .try_collect::<Vec<_>>()
-            .await?
-            .into_iter()
-            .map(|msg| msg.to_string())
-            .collect::<Vec<_>>()
-            .join("\n")
-    } else {
-        unreachable!();
-    };
-
-    if output.contains(&error_code.to_string()) {
-        anyhow::bail!(
-            "Failed to execute command: {}\n{}",
-            cmd,
-            output.replace(&error_code.to_string(), "")
-        );
+        let tar = crate::exec::export(docker, container_name, &config.working_dir).await?;
+        let file = fs::File::create(dest)?;
+        let mut writer = std::io::BufWriter::new(file);
+        writer.write_all(&tar)?;
     }
 
-    Ok(output)
+    Ok(executables)
 }

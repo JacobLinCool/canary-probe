@@ -9,14 +9,20 @@ async fn main() {
     }
     let docker = docker.unwrap();
 
-    let file = std::env::args().nth(1);
+    let file = std::env::args().find(|arg| arg.ends_with(".zip"));
     if file.is_none() {
         println!("Usage: canary-probe <zip-file>");
         return;
     }
     let file = file.unwrap();
 
-    let config = CheckConfig::default();
+    let mut config: CheckConfig = CheckConfig {
+        debug: std::env::args().any(|arg| arg == "--debug"),
+        ..CheckConfig::default()
+    };
+    if let Some(extract) = std::env::args().find(|arg| arg.starts_with("--extract=")) {
+        config.extract = Some(extract.split('=').nth(1).unwrap().to_string());
+    }
 
     let result = run_checks(&docker, &file, config).await;
     match result {
